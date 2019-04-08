@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Snake</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    canvas {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="container" width="500" height="500"></canvas>
+</body>
+</html>
+<script>
+  const container = document.getElementById('container');
+  const DIRECTION_CODE = {
+    ArrowUp: 'up',
+    ArrowRight: 'right',
+    ArrowDown: 'down',
+    ArrowLeft: 'left'
+  };
+  const ROUTES = ['up', 'right', 'down', 'left'];
+  const ROUTES_ENCODE = {
+    '0': 'up',
+    '-1': 'down',
+    '1': 'left',
+    '-2': 'right'
+  };
+  const ROUTES_DECODE = {
+    up: 0,
+    down: -1,
+    left: 1,
+    right: -2
+  };
+  const HORIZONTAL = 25;
+  const VERTICAL = 25;
+  const SPACING = 20;
+  class Area {
+    constructor(horizontal, vertical, spacing) {
+      this.horizontal = horizontal;   //  长
+      this.vertical = vertical;   //  宽
+      this.spacing = spacing;   //  间距
+      this.points = [];   //  地图所有点集合
+      this.food_point = [];   //  食物位置
+      this.snake_point = [];    //  蛇占据点
+      this.init();
+    }
+    init() {
+      this.points = Array.from({length: this.horizontal * this.vertical}).map((e, i) => e = [(i % this.horizontal) * this.spacing, ~~(i / this.vertical) * this.spacing]); 
+      this.draw();  
+    }
+    createFoodPoint() {
+      this.food_point = [~~(Math.random() * (this.horizontal - 1)) * this.spacing, ~~(Math.random() * (this.vertical - 1)) * this.spacing];
+    }
+    draw() {
+      ctx.clearRect(0, 0, this.horizontal * this.spacing, this.vertical * this.spacing);
+      ctx.strokeStyle = `rgb(0, 0, 0)`;
+      ctx.lineWidth = .5;
+      this.points.forEach(e => ctx.strokeRect(e[0], e[1], this.spacing, this.spacing));
+    }
+    detect() {
+      if(this.head[0][0] < 0 || this.head[0][1] < 0 || this.head[0][0] >= this.horizontal * this.spacing || this.head[0][1] >= this.vertical * this.spacing) {
+        clearInterval(this.animation);
+        this.animation = null;
+        this.freeze = true;
+        return true;
+      } else {
+        return false;
+      }
+      return true;
+    }
+  }
+  class Snake extends Area {
+    constructor(horizontal, vertical, spacing, head, body, freeze, direction, speed, animation) {
+      super(horizontal, vertical, spacing);
+      this.head = head;   //  蛇头位置
+      this.body = body;   //  蛇身点集合
+      this.freeze = freeze;   //  是否被冻结
+      this.direction = direction;   //  [[face]]->当前前进方向;[[to]]->要调整的方向;[[routes]]->可选方向
+      this.speed = speed;   //  速度
+      this.animation = animation;   //  移动动画
+      this.initSnake();
+    }
+    initSnake() {
+      this.head = [
+        [(this.horizontal & 1) ? (this.horizontal - 1) / 2 * this.spacing : this.horizontal / 2 * this.spacing,
+        (this.vertical & 1) ? (this.vertical - 1) / 2 * this.spacing : this.vertical / 2 * this.spacing]
+      ];
+      this.body = [];
+      this.freeze = false;
+      this.direction = {
+        face: '',
+        to: '',
+        routes: []
+      }; 
+      this.createFood();
+      this.drawSnake();
+    }
+    createFood() {
+      super.createFoodPoint();
+      this.snake_point = this.head.concat(this.body);
+      while(this.snake_point.join('|').includes(this.food_point.toString())) {
+        super.createFoodPoint();
+      };
+      ctx.fillRect(this.food_point[0], this.food_point[1], this.spacing, this.spacing);
+    }
+    drawSnake() {
+      super.draw();
+      if(this.head[0][0] == this.food_point[0] && this.head[0][1] == this.food_point[1]) {
+        this.eat();
+      } else {
+        if(this.food_point.length > 0) {
+          //  保留没有被吃掉的果实
+          ctx.fillRect(this.food_point[0], this.food_point[1], this.spacing, this.spacing);
+        }
+      }
+      if(!this.detect()) {
+        let cur_head_x = this.head[0][0];
+        let cur_head_y = this.head[0][1];
+        let direction_code = ROUTES_DECODE[this.direction.face];
+        let direction_code_calc = direction_code >= 0 ? (-~-direction_code) : (-~(-~direction_code));
+        this.head[0][direction_code_calc] = direction_code >= 0 ? (this.head[0][direction_code_calc] - this.spacing) : (this.head[0][direction_code_calc] + this.spacing);
+        if(this.body.length > 0) {
+          if(this.body.length > 1) {
+            for(let i = this.body.length - 1; i > 0; i--) {
+              this.body[i] = this.body[i - 1];  //  移动时，后一个点占据前一个点
+            }
+          }
+          this.body[0] = [cur_head_x, cur_head_y];
+          this.snake_point = this.head.concat(this.body);
+        }
+      } else {
+        if(window.confirm(`It's over! Restart?`)) {
+          super.init();
+          this.initSnake();
+        }
+      }
+      this.snake_point.forEach(e => {
+        ctx.fillRect(e[0], e[1], this.spacing, this.spacing);
+      });
+    }
+    eat() {
+      this.body.push([this.head[0][0], this.head[0][1]]);
+      this.createFood();
+    }
+    move() {
+      if(!this.freeze) {
+        if(this.direction.face === '' || (this.direction.face != this.direction.to && this.direction.routes.includes(this.direction.to))) {
+          this.direction.routes = ROUTES.filter(e => e != ROUTES_ENCODE[~ROUTES_DECODE[this.direction.to]]);
+          this.direction.face = this.direction.to;
+          this.drawSnake();   //  这步重绘是必要的，否则在关闭定时器时有短暂停顿动作
+          clearInterval(this.animation);
+          this.animation = setInterval(() => {    
+            this.drawSnake();
+          }, 1000 / this.speed);
+        }
+      }
+    }
+  }
+  function moveSnake(e) {
+    snake.direction.to = DIRECTION_CODE[e.key];
+    snake.move();
+  }
+  if(container.getContext('2d')) {
+    var ctx = container.getContext('2d');
+    document.body.addEventListener('keydown', moveSnake);
+    var area = new Area(HORIZONTAL, VERTICAL, SPACING);
+    var snake = new Snake(HORIZONTAL, VERTICAL, SPACING, [], [], true, {face: '', to: '', routes: []}, 10, null);
+  }
+</script>
