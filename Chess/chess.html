@@ -1,0 +1,2031 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content="text/html" charset="UTF-8">
+    <title>Chess</title>
+    <style>
+      .register {
+        width: calc(100vw - 40px);
+        height: calc(100vh - 100px);
+        background-color: antiquewhite;
+        text-align: center;
+        padding: 10px;
+      }
+      .register p {
+        font-size: 30px;
+        font-weight: bold;
+        margin-top: 200px;
+      }
+      .msg {
+        font-size: 23px;
+        margin-top: 30px;
+        text-decoration: underline;
+      }
+      .fade-out {
+        opacity: 0;
+        transition: all 2.5s;
+      }
+      .fight-name {
+        display: inline-block;
+        width: 100%;
+        height: 10%;
+        vertical-align: middle;
+        user-select: none;
+        font-size: 30px;
+        font-weight: bold;
+      }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <div id="findOpponent" class="register">
+      <p>Chinese Chess</p>
+      <div id="divRegister">
+        <span>请输入您的游戏昵称：</span>
+        <input id="txtName" style="border-color:#000;" type="text" />
+        <br />
+        <div><button id="btnRegister" style="margin-top:10px;">注册</button></div>
+      </div>
+      <div><button id="btnFindOpponent" style="margin-top:10px;display:none;">寻找对手</button></div>
+      <div id="msg" class="msg"></div>
+    </div>
+    <div id="findSuccess" style="text-align: center;position:flex;display:none;">
+      <div style="float: left;width: calc(50% - 300px);height: calc(100vh);text-align: right;">
+        <span id="opponentName" class="fight-name"></span>
+        <span id="opponentTime" class="fight-name"></span>
+      </div>
+      <canvas id="canvas" width="600" height="667"></canvas>
+      <div style="float: right;width: calc(50% - 300px);height: calc(100vh);text-align: left;">
+        <span style="display: inline-block;height:80%;"></span>
+        <span id="myTime" class="fight-name"></span>
+        <span id="myName" class="fight-name"></span>
+      </div>
+    </div>
+  </body>
+</html>
+<script>
+var canvas = document.getElementById('canvas');
+var divFindOpponent = document.getElementById('findOpponent');
+var divFindSuccess = document.getElementById('findSuccess');
+var socket = io.connect('http://192.168.2.53:3000');
+var divMsg = document.getElementById('msg');
+var myTime = document.getElementById('myTime');
+var opponentTime = document.getElementById('opponentTime');
+var id;
+var timer_turn = null;
+var timer = null;
+const PADDING_NUM = 32;
+const X_SPACE_CNT = 8;
+const Y_SPACE_CNT = 9;
+if(!!canvas.getContext) {
+  var context = canvas.getContext('2d');
+  var width = canvas.width;
+  var height = canvas.height;
+  var RADIUS = 25;
+  var assignTo = '';
+  var aryPiece = [];
+  var chess = null;
+  var turn = false;
+  var selectedChess = null;
+  var moveList = [];
+  var highLightChessPiece = [];
+}
+//  绘制背景
+function drawBackground() {
+  context.lineWidth = 1;
+  // 背景
+  context.globalAlpha = 0.8;
+  context.fillStyle = '#855E42';
+  context.fillRect(0, 0, this.width, this.height);
+  // 外边框
+  context.globalAlpha = 1;
+  context.strokeStyle = '#000000';
+  context.lineWidth = 10;
+  context.strokeRect(0, 0 , this.width, this.height);
+  // 内边框
+  context.globalAlpha = 1;
+  context.strokeStyle = '#000000';
+  context.lineWidth = 3;
+  context.strokeRect(22, 22, this.width - 44, this.height - 44);
+}
+//  清盘
+function clearChessBord() {
+  canvas.width = width;
+  canvas.height = height;
+}
+//  初始化棋盘
+function initChessBoard() {
+  const SPACE = (this.width - 64) / 8;
+  this.chessBoard.row = Y_SPACE_CNT;
+  this.chessBoard.col = X_SPACE_CNT;
+  context.globalAlpha = 1;
+  context.strokeStyle = '#000000';
+  context.lineWidth = 1;
+  context.strokeRect(PADDING_NUM, PADDING_NUM, this.width - PADDING_NUM * 2, this.height - PADDING_NUM * 2);
+  for(let y = 0; y < Y_SPACE_CNT; y++) {
+    for(let x = 0; x < X_SPACE_CNT; x++) {
+      //  分界
+      if(y == 4) {
+        if(x == 0) {
+          context.moveTo(PADDING_NUM, PADDING_NUM + y * SPACE);
+          context.lineTo(PADDING_NUM, PADDING_NUM + (y + 1) * SPACE);
+          context.moveTo(PADDING_NUM, PADDING_NUM + y * SPACE);
+          context.lineTo(PADDING_NUM + SPACE, PADDING_NUM + y * SPACE);
+          context.moveTo(PADDING_NUM, PADDING_NUM + (y + 1) * SPACE);
+          context.lineTo(PADDING_NUM + SPACE, PADDING_NUM + (y + 1) * SPACE);
+          context.stroke();
+        } else if(x == 7) {
+          context.moveTo(PADDING_NUM + 8 * SPACE, PADDING_NUM + y * SPACE);
+          context.lineTo(PADDING_NUM + 7 * SPACE, PADDING_NUM + y * SPACE);
+          context.moveTo(PADDING_NUM + 8 * SPACE, PADDING_NUM + y * SPACE);
+          context.lineTo(PADDING_NUM + 8 * SPACE, PADDING_NUM + (y + 1) * SPACE);
+          context.moveTo(PADDING_NUM + 8 * SPACE, PADDING_NUM + (y + 1) * SPACE);
+          context.lineTo(PADDING_NUM + 7 * SPACE, PADDING_NUM + (y + 1) * SPACE);
+          context.stroke();
+        } else {
+          context.moveTo(PADDING_NUM + x * SPACE, PADDING_NUM + y * SPACE);
+          context.lineTo(PADDING_NUM + (x + 1) * SPACE, PADDING_NUM + y * SPACE);
+          context.moveTo(PADDING_NUM + x * SPACE, PADDING_NUM + (y + 1) * SPACE);
+          context.lineTo(PADDING_NUM + (x + 1) * SPACE, PADDING_NUM + (y + 1) * SPACE);
+          context.stroke();
+        }
+      } else {
+        context.strokeRect(PADDING_NUM + SPACE * x, PADDING_NUM + y * SPACE, SPACE, SPACE);
+        if((y == 0 || y == 7) && x == 3) {
+          context.moveTo(PADDING_NUM + x * SPACE, PADDING_NUM + y * SPACE);
+          context.lineTo(PADDING_NUM + (x + 2) * SPACE, PADDING_NUM + (y + 2) * SPACE);
+          context.moveTo(PADDING_NUM + (x + 2) * SPACE, PADDING_NUM + y * SPACE);
+          context.lineTo(PADDING_NUM + x * SPACE, PADDING_NUM + (y + 2) * SPACE);
+        }
+        const ANCHOR_WIDTH = 10;
+        const ANCHOR_SPACE = 5;
+        if(y == 3 || y == 6) {
+          context.lineCap = 'square';
+          context.moveTo(PADDING_NUM + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+          context.lineTo(PADDING_NUM + ANCHOR_SPACE + ANCHOR_WIDTH, PADDING_NUM + y * SPACE -ANCHOR_SPACE);
+          context.moveTo(PADDING_NUM + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+          context.lineTo(PADDING_NUM + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE - ANCHOR_WIDTH);
+          context.moveTo(PADDING_NUM + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+          context.lineTo(PADDING_NUM + ANCHOR_SPACE + ANCHOR_WIDTH, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+          context.moveTo(PADDING_NUM + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+          context.lineTo(PADDING_NUM + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE + ANCHOR_WIDTH);
+          let aryAnchor = [2, 4, 6];
+          for(let i = 0, len = aryAnchor.length; i < len; i++) {
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE - ANCHOR_WIDTH, PADDING_NUM + y * SPACE -
+            ANCHOR_SPACE);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE -
+            ANCHOR_WIDTH);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE -
+            ANCHOR_WIDTH);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE + ANCHOR_WIDTH, PADDING_NUM + y * SPACE -
+            ANCHOR_SPACE);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE - ANCHOR_WIDTH, PADDING_NUM + y * SPACE +
+            ANCHOR_SPACE);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE +
+            ANCHOR_WIDTH);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE +
+            ANCHOR_WIDTH);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE + ANCHOR_WIDTH, PADDING_NUM + y * SPACE +
+            ANCHOR_SPACE);
+          }
+          context.moveTo(PADDING_NUM + 8 * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+          context.lineTo(PADDING_NUM + 8 * SPACE - ANCHOR_SPACE - ANCHOR_WIDTH, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+          context.moveTo(PADDING_NUM + 8 * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+          context.lineTo(PADDING_NUM + 8 * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE - ANCHOR_WIDTH);
+          context.moveTo(PADDING_NUM + 8 * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+          context.lineTo(PADDING_NUM + 8 * SPACE - ANCHOR_SPACE - ANCHOR_WIDTH, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+          context.moveTo(PADDING_NUM + 8 * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+          context.lineTo(PADDING_NUM + 8 * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE + ANCHOR_WIDTH);
+        }
+        if(y == 2 || y == 7) {
+          let aryAnchor = [1, 7];
+          for(let i = 0, len = aryAnchor.length; i < len; i++) {
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE - ANCHOR_WIDTH, PADDING_NUM + y * SPACE -
+            ANCHOR_SPACE);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE -
+            ANCHOR_WIDTH);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE -
+            ANCHOR_WIDTH);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE - ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE + ANCHOR_WIDTH, PADDING_NUM + y * SPACE -
+            ANCHOR_SPACE);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE - ANCHOR_WIDTH, PADDING_NUM + y * SPACE +
+            ANCHOR_SPACE);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE - ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE +
+            ANCHOR_WIDTH);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE +
+            ANCHOR_WIDTH);
+            context.moveTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE, PADDING_NUM + y * SPACE + ANCHOR_SPACE);
+            context.lineTo(PADDING_NUM + aryAnchor[i] * SPACE + ANCHOR_SPACE + ANCHOR_WIDTH, PADDING_NUM + y * SPACE +
+            ANCHOR_SPACE);
+          }
+        }
+        context.stroke();
+      }
+    }
+  }
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.font = '40px KaiTi';
+  context.fillStyle = '#000000';
+  context.fillText('楚\t河', PADDING_NUM + SPACE * 2, PADDING_NUM + 4.5 * SPACE);
+  context.fillText('汉\t界', PADDING_NUM + SPACE * 6, PADDING_NUM + 4.5 * SPACE);
+  context.stroke();
+  for(var crosswise = 0, aryCrosswise = []; crosswise <= Y_SPACE_CNT; crosswise++) {
+    aryCrosswise = [];
+    for(var lengthway = 0, objLocation = {}; lengthway <= X_SPACE_CNT; lengthway++) {
+      objLocation = {};
+      objLocation.x = PADDING_NUM + lengthway * SPACE;
+      objLocation.y = PADDING_NUM + crosswise * SPACE;
+      objLocation.row = crosswise;
+      objLocation.col = lengthway;
+      objLocation.assignTo = assignTo == 'HAN' ? (crosswise < 5 ? 'CHU' : 'HAN') : (crosswise < 5 ? 'HAN' : 'CHU');
+      objLocation.chessPiece = null;
+      if((crosswise <= 2 || crosswise >= 7) && lengthway >= 3 && lengthway <= 5) {
+        objLocation.kingArea = true;
+      }
+      aryCrosswise.push(objLocation);
+    }
+    this.chessBoard.push(aryCrosswise);
+  }
+}
+//  将军
+function drawCheck() {
+  const SPACE = (this.width - 64) / 8;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.font = '80px KaiTi';
+  context.fillStyle = '#000000';
+  context.fillText('将', PADDING_NUM + SPACE * 3.5, PADDING_NUM + 4 * SPACE);
+  context.fillText('军', PADDING_NUM + SPACE * 4.5, PADDING_NUM + 5 * SPACE);
+  context.stroke();
+  setTimeout(() => {
+    clearChessBord();
+    chess = new Chess(width, height);
+    chess.init();
+    initChessPiece.call(chess, aryPiece);
+    fillChessBoard.call(chess);
+    detectionRoute.call(chess);
+    routeList.call(chess);
+  }, 2000);
+}
+function drawGameOver(msg, lose) {
+  const SPACE = (this.width - 64) / 8;
+  context.globalAlpha = 1;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.font = '80px KaiTi';
+  context.fillStyle = lose ? '#000000' : '#CC0000';
+  context.fillText(msg, PADDING_NUM + SPACE * 4, PADDING_NUM + 4.5 * SPACE);
+  context.stroke();
+}
+/*
+  function:           棋子构造函数
+  params:  name:      棋子名称
+            radius:    棋子半径
+            assignTo:  棋子所属
+            x:         棋子横坐标
+            y:         棋子纵坐标
+            row:       棋子所在行
+            col:       棋子所在列
+            moveType:  棋子类型
+*/
+function ChessPiece(name, radius, assignTo, x, y, row, col, moveType, checked) {
+  this.name = name;
+  this.radius = radius;
+  this.assignTo = assignTo;
+  this.x = x;
+  this.y = y;
+  this.row = row;
+  this.col = col;
+  this.moveType = moveType;
+  this.checked = checked;
+  this.moveList = [];   //  可行驶路线
+  this.beatList = [];   //  已征服棋子
+  this.attackList = []; //  可征服棋子
+}
+//  初始化棋子
+function initChessPiece(aryPieceFormat) {
+  var aryPiece = aryPieceFormat || aryPiece;
+  for(let i = 0, len = aryPiece.length, objPiece; i < len; i++) {
+    objPiece = new ChessPiece(aryPiece[i].name, aryPiece[i].radius, aryPiece[i].assignTo, aryPiece[i].x, aryPiece[i].y, aryPiece[i].row, aryPiece[i].col, aryPiece[i].moveType, aryPiece[i].checked);
+    this.chessPiece.push(objPiece);
+  }
+}
+//  将棋子布置到棋盘
+function fillChessBoard() {
+  this.chessBoard.forEach(aryRow => {
+    aryRow.forEach(e => {
+      e.chessPiece = null;
+    });
+  });
+  for(let i = 0, len = this.chessPiece.length; i < len; i++) {
+    context.beginPath();
+    context.fillStyle = '#B6A642';
+    if(highLightChessPiece.length > 0) {
+      if(highLightChessPiece[0] == this.chessPiece[i].row && highLightChessPiece[1] == this.chessPiece[i].col) {
+        context.fillStyle = 'springgreen';
+      }
+    }
+    context.globalAlpha = 1;
+    if(this.chessPiece[i].checked) {
+      context.shadowOffsetX = 3;
+      context.shadowOffsetY = 3;
+      context.shadowColor = '#000';
+      context.shadowBlur = 15;
+    }
+    context.arc(this.chessPiece[i].x, this.chessPiece[i].y, this.chessPiece[i].radius, 0, Math.PI * 2);
+    context.stroke();
+    context.fill();
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.shadowBlur = 0;
+    if(this.chessPiece[i].assignTo == 'HAN') {
+      context.fillStyle = '#CC0000';
+    } else {
+      context.fillStyle = '#000';
+    }
+    context.font = 'bold 30px KaiTi';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(this.chessPiece[i].name, this.chessPiece[i].x, this.chessPiece[i].y);
+    this.chessBoard[this.chessPiece[i].row][this.chessPiece[i].col].chessPiece = this.chessPiece[i];
+  }
+}
+//  检测棋子行驶路线
+function detectionRoute() {
+  this.chessPiece.forEach(e => {
+    if(e.assignTo == assignTo) {
+      routeRegular.call(e, this.chessBoard);
+    }
+  });
+}
+//  棋子行驶路线规则(计算出常规路线外，还要检测每一步是否导致被将军)
+function routeRegular(chessBoard) {
+  var row, col, lastChessPiece;
+  let aryChessBoard = chessBoard;
+  this.moveList = [];
+  switch(this.moveType) {
+    case 1:   //  車、车
+      //  向上移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      while(row > 0) {
+        if(!aryChessBoard[row - 1][col].chessPiece) {
+          lastChessPiece = null;
+          row--;
+          aryChessBoard[row + 1][col].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+        } else {
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          if(aryChessBoard[row - 1][col].chessPiece.assignTo != assignTo) {
+            lastChessPiece = aryChessBoard[row - 1][col].chessPiece;
+            row--;
+            aryChessBoard[row + 1][col].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+              this.attackList.push(lastChessPiece);
+            }
+          }
+          if(lastChessPiece != null) {
+            aryChessBoard[row][col].chessPiece = lastChessPiece;
+          }
+          break;
+        }
+      }
+      aryChessBoard[this.row][this.col].chessPiece = this;
+      //  向下移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      while(row < aryChessBoard.row) {
+        if(!aryChessBoard[row + 1][col].chessPiece) {
+          lastChessPiece = null;
+          row++;
+          aryChessBoard[row - 1][col].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+        } else {
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          if(aryChessBoard[row + 1][col].chessPiece.assignTo != assignTo) {
+            lastChessPiece = aryChessBoard[row + 1][col].chessPiece;
+            row++;
+            aryChessBoard[row - 1][col].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+              this.attackList.push(lastChessPiece);
+            }
+          }
+          if(lastChessPiece != null) {
+            aryChessBoard[row][col].chessPiece = lastChessPiece;
+          }
+          break;
+        }
+      }
+      aryChessBoard[this.row][this.col].chessPiece = this;
+      //  向左移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      while(col > 0) {
+        if(!aryChessBoard[row][col - 1].chessPiece) {
+          lastChessPiece = null;
+          col--;
+          aryChessBoard[row][col + 1].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+        } else {
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          if(aryChessBoard[row][col - 1].chessPiece.assignTo != assignTo) {
+            lastChessPiece = aryChessBoard[row][col - 1].chessPiece;
+            col--;
+            aryChessBoard[row][col + 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+              this.attackList.push(lastChessPiece);
+            }
+          }
+          if(lastChessPiece != null) {
+            aryChessBoard[row][col].chessPiece = lastChessPiece;
+          }
+          break;
+        }
+      }
+      aryChessBoard[this.row][this.col].chessPiece = this;
+      //  向右移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      while (col < aryChessBoard.col) {
+        if (!aryChessBoard[row][col + 1].chessPiece) {
+          lastChessPiece = null;
+          col++;
+          aryChessBoard[row][col - 1].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+        } else {
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          if (aryChessBoard[row][col + 1].chessPiece.assignTo != assignTo) {
+            lastChessPiece = aryChessBoard[row][col + 1].chessPiece;
+            col++;
+            aryChessBoard[row][col - 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+              this.attackList.push(lastChessPiece);
+            }
+          }
+          if(lastChessPiece != null) {
+            aryChessBoard[row][col].chessPiece = lastChessPiece;
+          }
+          break;
+        }
+      }
+      aryChessBoard[this.row][this.col].chessPiece = this;
+      break;
+    case 2:   //  馬、马
+      //  向北偏东移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 1 && col < aryChessBoard.col) {
+        //  未别马脚
+        if(!aryChessBoard[row - 1][col].chessPiece) {
+          if (!aryChessBoard[row - 2][col + 1].chessPiece) {
+            lastChessPiece = null;
+            row -= 2;
+            col++;
+            aryChessBoard[row + 2][col - 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 2][col + 1].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 2][col + 1].chessPiece;
+              row -= 2;
+              col++;
+              aryChessBoard[row + 2][col - 1].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向东偏北移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 0 && col < aryChessBoard.col - 1) {
+        //  未别马脚
+        if(!aryChessBoard[row][col + 1].chessPiece) {
+          if(!aryChessBoard[row - 1][col + 2].chessPiece) {
+            lastChessPiece = null;
+            row--;
+            col += 2;
+            aryChessBoard[row + 1][col - 2].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 1][col + 2].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 1][col + 2].chessPiece;
+              row--;
+              col += 2;
+              aryChessBoard[row + 1][col - 2].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向东偏南移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row && col < aryChessBoard.col - 1) {
+        //  未别马脚
+        if(!aryChessBoard[row][col + 1].chessPiece) {
+          if(!aryChessBoard[row + 1][col + 2].chessPiece) {
+            lastChessPiece = null;
+            row++;
+            col += 2;
+            aryChessBoard[row - 1][col - 2].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 1][col + 2].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 1][col + 2].chessPiece;
+              row++;
+              col += 2;
+              aryChessBoard[row - 1][col - 2].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向南偏东移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row - 1 && col < aryChessBoard.col) {
+        //  未别马脚
+        if(!aryChessBoard[row + 1][col].chessPiece) {
+          if(!aryChessBoard[row + 2][col + 1].chessPiece) {
+            lastChessPiece = null;
+            row += 2;
+            col++;
+            aryChessBoard[row - 2][col - 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 2][col + 1].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 2][col + 1].chessPiece;
+              row += 2;
+              col++;
+              aryChessBoard[row - 2][col - 1].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向南偏西移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row - 1 && col > 0) {
+        //  未别马脚
+        if(!aryChessBoard[row + 1][col].chessPiece) {
+          if(!aryChessBoard[row + 2][col - 1].chessPiece) {
+            lastChessPiece = null;
+            row += 2;
+            col--;
+            aryChessBoard[row - 2][col + 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 2][col - 1].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 2][col - 1].chessPiece;
+              row += 2;
+              col--;
+              aryChessBoard[row - 2][col + 1].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向西偏南移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row && col > 1) {
+        //  未别马脚
+        if(!aryChessBoard[row][col - 1].chessPiece) {
+          if(!aryChessBoard[row + 1][col - 2].chessPiece) {
+            lastChessPiece = null;
+            row++;
+            col -= 2;
+            aryChessBoard[row - 1][col + 2].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 1][col - 2].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 1][col - 2].chessPiece;
+              row++;
+              col -= 2;
+              aryChessBoard[row - 1][col + 2].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向西偏北移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 0 && col > 1) {
+        //  未别马脚
+        if(!aryChessBoard[row][col - 1].chessPiece) {
+          if(!aryChessBoard[row - 1][col - 2].chessPiece) {
+            lastChessPiece = null;
+            row--;
+            col -= 2;
+            aryChessBoard[row + 1][col + 2].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 1][col - 2].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 1][col - 2].chessPiece;
+              row--;
+              col -= 2;
+              aryChessBoard[row + 1][col + 2].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向北偏西移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 1 && col > 0) {
+        //  未别马脚
+        if(!aryChessBoard[row - 1][col].chessPiece) {
+          if(!aryChessBoard[row - 2][col - 1].chessPiece) {
+            lastChessPiece = null;
+            row -= 2;
+            col--;
+            aryChessBoard[row + 2][col + 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 2][col - 1].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 2][col - 1].chessPiece;
+              row -= 2;
+              col--;
+              aryChessBoard[row + 2][col + 1].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      break;
+    case 3:   //  象、相
+      //  向东北方向移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 1 && col < aryChessBoard.col - 1) {
+        //  未塞象眼、不能越界
+        if(!aryChessBoard[row - 1][col + 1].chessPiece && aryChessBoard[row - 2][col + 2].assignTo == assignTo) {
+          if(!aryChessBoard[row - 2][col + 2].chessPiece) {
+            lastChessPiece = null;
+            row -= 2;
+            col += 2;
+            aryChessBoard[row + 2][col - 2].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 2][col + 2].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 2][col + 2].chessPiece;
+              row -= 2;
+              col += 2;
+              aryChessBoard[row + 2][col - 2].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向东南方向移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row - 1 && col < aryChessBoard.col - 1) {
+        // 未塞象眼、不能越界
+        if(!aryChessBoard[row + 1][col + 1].chessPiece && aryChessBoard[row + 2][col + 2].assignTo == assignTo) {
+          if(!aryChessBoard[row + 2][col + 2].chessPiece) {
+            lastChessPiece = null;
+            row += 2;
+            col += 2;
+            aryChessBoard[row - 2][col - 2].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 2][col + 2].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 2][col + 2].chessPiece;
+              row += 2;
+              col += 2;
+              aryChessBoard[row - 2][col - 2].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向西南方向移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row - 1 && col > 1) {
+        //  未塞象眼、不能越界
+        if(!aryChessBoard[row + 1][col - 1].chessPiece && aryChessBoard[row + 2][col - 2].assignTo == assignTo) {
+          if(!aryChessBoard[row + 2][col - 2].chessPiece) {
+            lastChessPiece = null;
+            row += 2;
+            col -= 2;
+            aryChessBoard[row - 2][col + 2].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 2][col - 2].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 2][col - 2].chessPiece;
+              row += 2;
+              col -= 2;
+              aryChessBoard[row - 2][col + 2].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向西北方向移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 1 && col > 1) {
+        //  未塞象眼、不能越界
+        if(!aryChessBoard[row - 1][col - 1].chessPiece && aryChessBoard[row - 2][col - 2].assignTo == assignTo) {
+          if(!aryChessBoard[row - 2][col - 2].chessPiece) {
+            lastChessPiece = null;
+            row -= 2;
+            col -= 2;
+            aryChessBoard[row + 2][col + 2].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 2][col - 2].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 2][col - 2].chessPiece;
+              row -= 2;
+              col -= 2;
+              aryChessBoard[row + 2][col + 2].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      break;
+    case 4:   //  士、仕
+      //  向西南方向移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row) {
+        //  不能离开保护区域
+        if(aryChessBoard[row + 1][col - 1].kingArea) {
+          if(!aryChessBoard[row + 1][col - 1].chessPiece) {
+            lastChessPiece = null;
+            row++;
+            col--;
+            aryChessBoard[row - 1][col + 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 1][col - 1].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 1][col - 1].chessPiece;
+              row++;
+              col--;
+              aryChessBoard[row - 1][col + 1].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向东南方向移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row) {
+        //  不能离开保护区域
+        if(aryChessBoard[row + 1][col + 1].kingArea) {
+          if(!aryChessBoard[row + 1][col + 1].chessPiece) {
+            lastChessPiece = null;
+            row++;
+            col++;
+            aryChessBoard[row - 1][col - 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 1][col + 1].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 1][col + 1].chessPiece;
+              row++;
+              col++;
+              aryChessBoard[row - 1][col - 1].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向东北方向移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 0) {
+        //  不能离开保护区域
+        if(aryChessBoard[row - 1][col + 1].kingArea) {
+          if(!aryChessBoard[row - 1][col + 1].chessPiece) {
+            lastChessPiece = null;
+            row--;
+            col++;
+            aryChessBoard[row + 1][col - 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 1][col + 1].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 1][col + 1].chessPiece;
+              row--;
+              col++;
+              aryChessBoard[row + 1][col - 1].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向西北方向移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 0) {
+        //  不能离开保护区域
+        if(aryChessBoard[row - 1][col - 1].kingArea) {
+          if(!aryChessBoard[row - 1][col - 1].chessPiece) {
+            lastChessPiece = null;
+            row--;
+            col--;
+            aryChessBoard[row + 1][col + 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 1][col - 1].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 1][col - 1].chessPiece;
+              row--;
+              col--;
+              aryChessBoard[row + 1][col + 1].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      break;
+    case 5:   //  将、帅
+      //  向上移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row > 0) {
+        //  不能离开保护区域
+        if(aryChessBoard[row - 1][col].kingArea) {
+          if(!aryChessBoard[row - 1][col].chessPiece) {
+            lastChessPiece = null;
+            row--;
+            aryChessBoard[row + 1][col].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row - 1][col].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row - 1][col].chessPiece;
+              row--;
+              aryChessBoard[row + 1][col].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向下移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(row < aryChessBoard.row) {
+        //  不能离开保护区域
+        if(aryChessBoard[row + 1][col].kingArea) {
+          if(!aryChessBoard[row + 1][col].chessPiece) {
+            lastChessPiece = null;
+            row++;
+            aryChessBoard[row - 1][col].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 1][col].chessPiece.assignTo != assignTo) {
+              lastChessPiece = aryChessBoard[row + 1][col].chessPiece;
+              row++;
+              aryChessBoard[row - 1][col].chessPiece = null;
+              aryChessBoard[row][col].chessPiece = this;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(lastChessPiece);
+              }
+            }
+          }
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          aryChessBoard[this.row][this.col].chessPiece = this;
+        }
+      }
+      //  向左移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(aryChessBoard[row][col - 1].kingArea) {
+        if(!aryChessBoard[row][col - 1].chessPiece) {
+          col--;
+          aryChessBoard[row][col + 1].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+        } else {
+          if(aryChessBoard[row][col - 1].chessPiece.assignTo != assignTo) {
+            lastChessPiece = aryChessBoard[row][col - 1].chessPiece;
+            col--;
+            aryChessBoard[row][col + 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+              this.attackList.push(aryChessBoard[row][col].chessPiece);
+            }
+          }
+        }
+        aryChessBoard[row][col].chessPiece = lastChessPiece;
+        aryChessBoard[this.row][this.col].chessPiece = this;
+      }
+      //  向右移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      if(aryChessBoard[row][col + 1].kingArea) {
+        if(!aryChessBoard[row][col + 1].chessPiece) {
+          col++;
+          aryChessBoard[row][col - 1].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+        } else {
+          if(aryChessBoard[row][col + 1].chessPiece.assignTo != assignTo) {
+            lastChessPiece = aryChessBoard[row][col + 1].chessPiece;
+            col++;
+            aryChessBoard[row][col - 1].chessPiece = null;
+            aryChessBoard[row][col].chessPiece = this;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+              this.attackList.push(aryChessBoard[row][col].chessPiece);
+            }
+          }
+        }
+        aryChessBoard[row][col].chessPiece = lastChessPiece;
+        aryChessBoard[this.row][this.col].chessPiece = this;
+      }
+      break;
+    case 6:   //  炮
+      //  向上移动
+      row = this.row;
+      col = this.col;
+      lastChessPiece = null;
+      while (row > 0) {
+        if (!aryChessBoard[row - 1][col].chessPiece) {
+          lastChessPiece = null;
+          row--;
+          aryChessBoard[row + 1][col].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+          if(row == 0) {
+            aryChessBoard[row][col].chessPiece = null;
+          }
+        } else {
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          row--;
+          while(row > 0) {
+            if(aryChessBoard[row - 1][col].chessPiece) {
+              if (aryChessBoard[row - 1][col].chessPiece.assignTo != assignTo) {
+                lastChessPiece = aryChessBoard[row - 1][col].chessPiece;
+                row--;
+                aryChessBoard[row + 1][col].chessPiece = null;
+                aryChessBoard[row][col].chessPiece = this;
+                if(!checkMate(assignTo, aryChessBoard)) {
+                  this.moveList.push([row, col]);
+                  this.attackList.push(aryChessBoard[row][col].chessPiece);
+                }
+              }
+              break;
+            } else {
+              row--;
+            }
+          }
+          if(lastChessPiece != null) {
+            aryChessBoard[row][col].chessPiece = lastChessPiece;
+          }
+          break;
+        }
+      }
+      aryChessBoard[this.row][this.col].chessPiece = this;
+      //  向下移动
+      row = this.row;
+      col = this.col;
+      while(row < aryChessBoard.row) {
+        if(!aryChessBoard[row + 1][col].chessPiece) {
+          lastChessPiece = null;
+          row++;
+          aryChessBoard[row - 1][col].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+          if(row == aryChessBoard.row) {
+            aryChessBoard[row][col].chessPiece = null;
+          }
+        } else {
+          aryChessBoard[row][col].chessPiece = lastChessPiece;
+          row++;
+          while(row < aryChessBoard.row) {
+            if(aryChessBoard[row + 1][col].chessPiece) {
+              if(aryChessBoard[row + 1][col].chessPiece.assignTo != assignTo) {
+                lastChessPiece = aryChessBoard[row + 1][col].chessPiece;
+                row++;
+                aryChessBoard[row - 1][col].chessPiece = null;
+                aryChessBoard[row][col].chessPiece = this;
+                if(!checkMate(assignTo, aryChessBoard)) {
+                  this.moveList.push([row, col]);
+                  this.attackList.push(aryChessBoard[row][col].chessPiece);
+                }
+              }
+              break;
+            } else {
+              row++;
+            }
+          }
+          if(lastChessPiece != null) {
+            aryChessBoard[row][col].chessPiece = lastChessPiece;
+          }
+          break;
+        }
+      }
+      aryChessBoard[this.row][this.col].chessPiece = this;
+      //  向左移动
+      row = this.row;
+      col = this.col;
+      while(col > 0) {
+        if(!aryChessBoard[row][col - 1].chessPiece) {
+          lastChessPiece = null;
+          col--;
+          aryChessBoard[row][col + 1].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+          if(col == 0) {
+            aryChessBoard[row][col].chessPiece = null;
+          }
+        } else {
+          aryChessBoard[row][col].chessPiece = null;
+          col--;
+          while(col > 0) {
+            if(aryChessBoard[row][col - 1].chessPiece) {
+              if(aryChessBoard[row][col - 1].chessPiece.assignTo != assignTo) {
+                lastChessPiece = aryChessBoard[row][col - 1].chessPiece;
+                col--;
+                aryChessBoard[this.row][this.col].chessPiece = null;
+                aryChessBoard[row][col].chessPiece = this;
+                if(!checkMate(assignTo, aryChessBoard)) {
+                  this.moveList.push([row, col]);
+                  this.attackList.push(aryChessBoard[row][col].chessPiece);
+                }
+              }
+              break;
+            } else {
+              col--;
+            }
+          }
+          if(lastChessPiece != null) {
+            aryChessBoard[row][col].chessPiece = lastChessPiece;
+          }
+          break;
+        }
+      }
+      aryChessBoard[this.row][this.col].chessPiece = this;
+      //  向右移动
+      row = this.row;
+      col = this.col;
+      while(col < aryChessBoard.col) {
+        if(!aryChessBoard[row][col + 1].chessPiece) {
+          lastChessPiece = null;
+          col++;
+          aryChessBoard[row][col - 1].chessPiece = null;
+          aryChessBoard[row][col].chessPiece = this;
+          if(!checkMate(assignTo, aryChessBoard)) {
+            this.moveList.push([row, col]);
+          }
+          if(col == aryChessBoard.col) {
+            aryChessBoard[row][col].chessPiece = null;
+          }
+        } else {
+          aryChessBoard[row][col].chessPiece = null;
+          col++;
+          while(col < aryChessBoard.col) {
+            if(aryChessBoard[row][col + 1].chessPiece) {
+              if(aryChessBoard[row][col + 1].chessPiece.assignTo != assignTo) {
+                lastChessPiece = aryChessBoard[row][col + 1].chessPiece;
+                col++;
+                aryChessBoard[this.row][this.col].chessPiece = null;
+                aryChessBoard[row][col].chessPiece = this;
+                if(!checkMate(assignTo, aryChessBoard)) {
+                  this.moveList.push([row, col]);
+                  this.attackList.push(aryChessBoard[row][col].chessPiece);
+                }
+              }
+              break;
+            } else {
+              col++;
+            }
+          }
+          if(lastChessPiece != null) {
+            aryChessBoard[row][col].chessPiece = lastChessPiece;
+          }
+          break;
+        }
+      }
+      aryChessBoard[this.row][this.col].chessPiece = this;
+      break;
+    case 7:   //  卒、兵
+      if(aryChessBoard[0][0].assignTo != assignTo) {
+        //  前进
+        row = this.row;
+        col = this.col;
+        if (row > 0) {
+          if (!aryChessBoard[row - 1][col].chessPiece) {
+            row--;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if (aryChessBoard[row - 1][col].chessPiece.assignTo != assignTo) {
+              row--;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(aryChessBoard[row][col].chessPiece);
+              }
+            }
+          }
+        }
+      } else {
+        //  前进
+        row = this.row;
+        col = this.col;
+        if(row < aryChessBoard.row) {
+          if(!aryChessBoard[row + 1][col].chessPiece) {
+            row++;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if(aryChessBoard[row + 1][col].chessPiece.assignTo != assignTo) {
+              row++;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(aryChessBoard[row][col].chessPiece);
+              }
+            }
+          }
+        }
+      }
+      row = this.row;
+      col = this.col;
+      // 越界后可以左右移动
+      if (aryChessBoard[row][col].assignTo != assignTo) {
+        // 向左移动
+        row = this.row;
+        col = this.col;
+        if (col > 0) {
+          if (!aryChessBoard[row][col - 1].chessPiece) {
+            col--;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if (aryChessBoard[row][col - 1].chessPiece.assignTo != assignTo) {
+              col--;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(aryChessBoard[row][col].chessPiece);
+              }
+            }
+          }
+        }
+        //  向右移动
+        row = this.row;
+        col = this.col;
+        if (col < aryChessBoard.col) {
+          if (!aryChessBoard[row][col + 1].chessPiece) {
+            col++;
+            if(!checkMate(assignTo, aryChessBoard)) {
+              this.moveList.push([row, col]);
+            }
+          } else {
+            if (aryChessBoard[row][col + 1].chessPiece.assignTo != assignTo) {
+              col++;
+              if(!checkMate(assignTo, aryChessBoard)) {
+                this.moveList.push([row, col]);
+                this.attackList.push(aryChessBoard[row][col].chessPiece);
+              }
+            }
+          }
+        }
+      }
+      break;
+    default:
+      break;
+  }
+}
+/*
+  function:     将军检测机制
+  params:       assignTo:     阵营
+                chessBoard:   棋盘数据
+*/
+function checkMate(assignTo, chessBoard) {
+  var kingChessPiece = null;
+  var findKing = false;
+  var bCheckMate = false;
+  for(let i = 0, row = chessBoard.length; i < row; i++) {
+    if(!findKing) {
+      for (let j = 0, col = chessBoard[i].length; j < col; j++) {
+        if (chessBoard[i][j].chessPiece && chessBoard[i][j].chessPiece.moveType == 5 && chessBoard[i][j].chessPiece.assignTo == assignTo) {
+          kingChessPiece = chessBoard[i][j];
+          findKing = true;
+          break;
+        }
+      }
+    } else {
+      break;
+    }
+  }
+  var row, col;
+  //  被車将(北方)
+  if(kingChessPiece.row > 0) {
+    row = kingChessPiece.row;
+    col = kingChessPiece.col;
+    while(row > 0) {
+      if(chessBoard[row - 1][col].chessPiece) {
+        if(chessBoard[row - 1][col].chessPiece.assignTo != kingChessPiece.assignTo && chessBoard[row - 1][col].chessPiece.moveType == 1) {
+          bCheckMate = true;
+        }
+        break;
+      } else {
+        row--;
+      }
+    }
+  }
+  //  被車将(南方)
+  if(kingChessPiece.row < chessBoard.row) {
+    row = kingChessPiece.row;
+    col = kingChessPiece.col;
+    while(row < chessBoard.row) {
+      if(chessBoard[row + 1][col].chessPiece) {
+        if(chessBoard[row + 1][col].chessPiece.assignTo != kingChessPiece.assignTo && chessBoard[row + 1][col].chessPiece.moveType == 1) {
+          bCheckMate = true;
+        }
+        break;
+      } else {
+        row++;
+      }
+    }
+  }
+  //  被車将(西方)
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  while(col > 0) {
+    if(chessBoard[row][col - 1].chessPiece) {
+      if(chessBoard[row][col - 1].chessPiece.assignTo != kingChessPiece.assignTo && chessBoard[row][col - 1].chessPiece.moveType == 1) {
+        bCheckMate = true;
+      }
+      break;
+    } else {
+      col--;
+    }
+  }
+  //  被車将(东方)
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  while(col < chessBoard.col) {
+    if(chessBoard[row][col + 1].chessPiece) {
+      if(chessBoard[row][col + 1].chessPiece.assignTo != kingChessPiece.assignTo && chessBoard[row][col + 1].chessPiece.moveType == 1) {
+        bCheckMate = true;
+      }
+      break;
+    } else {
+      col++;
+    }
+  }
+  //  被马将
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  if(row == 0 || row == 1 || row == 2) {
+    if(chessBoard[row + 1][col + 2].chessPiece && chessBoard[row + 1][col + 2].chessPiece.moveType == 2 && chessBoard[row + 1][col + 2].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row + 1][col + 1].chessPiece) {
+      bCheckMate = true;
+    }
+    if(chessBoard[row + 2][col + 1].chessPiece && chessBoard[row + 2][col + 1].chessPiece.moveType == 2 && chessBoard[row + 2][col + 1].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row + 1][col + 1].chessPiece) {
+      bCheckMate = true;
+    }
+    if(chessBoard[row + 2][col - 1].chessPiece && chessBoard[row + 2][col - 1].chessPiece.moveType == 2 && chessBoard[row + 2][col - 1].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row + 1][col - 1].chessPiece) {
+      bCheckMate = true;
+    }
+    if(chessBoard[row + 1][col - 2].chessPiece && chessBoard[row + 1][col - 2].chessPiece.moveType == 2 && chessBoard[row + 1][col - 2].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row + 1][col - 1].chessPiece) {
+      bCheckMate = true;
+    }
+    if(row == 1 || row == 2) {
+      if(chessBoard[row - 1][col + 2].chessPiece && chessBoard[row - 1][col + 2].chessPiece.moveType == 2 && chessBoard[row - 1][col + 2].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row - 1][col + 1].chessPiece) {
+        bCheckMate = true;
+      }
+      if(chessBoard[row - 1][col - 2].chessPiece && chessBoard[row - 1][col - 2].chessPiece.moveType == 2 && chessBoard[row - 1][col - 2].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row - 1][col - 1].chessPiece) {
+        bCheckMate = true;
+      }
+      if(row == 2) {
+        if(chessBoard[row - 2][col + 1].chessPiece && chessBoard[row - 2][col + 1].chessPiece.moveType == 2 && chessBoard[row - 2][col + 1].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row - 1][col + 1].chessPiece) {
+          bCheckMate = true;
+        }
+        if(chessBoard[row - 2][col - 1].chessPiece && chessBoard[row - 2][col - 1].chessPiece.moveType == 2 && chessBoard[row - 2][col - 1].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row - 1][col - 1].chessPiece) {
+          bCheckMate = true;
+        }
+      }
+    }
+  }
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  if(row == chessBoard.row || row == chessBoard.row - 1 || row == chessBoard.row - 2) {
+    if(chessBoard[row - 1][col + 2].chessPiece && chessBoard[row - 1][col + 2].chessPiece.moveType == 2 && chessBoard[row - 1][col + 2].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row - 1][col + 1].chessPiece) {
+      bCheckMate = true;
+    }
+    if(chessBoard[row - 2][col + 1].chessPiece && chessBoard[row - 2][col + 1].chessPiece.moveType == 2 && chessBoard[row - 2][col + 1].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row - 1][col + 1].chessPiece) {
+      bCheckMate = true;
+    }
+    if(chessBoard[row - 2][col - 1].chessPiece && chessBoard[row - 2][col - 1].chessPiece.moveType == 2 && chessBoard[row - 2][col - 1].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row - 1][col - 1].chessPiece) {
+      bCheckMate = true;
+    }
+    if(chessBoard[row - 1][col - 2].chessPiece && chessBoard[row - 1][col - 2].chessPiece.moveType == 2 && chessBoard[row - 1][col - 2].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row - 1][col - 1].chessPiece) {
+      bCheckMate = true;
+    }
+    if(row == chessBoard.row - 1 || row == chessBoard.row - 2) {
+      if(chessBoard[row + 1][col + 2].chessPiece && chessBoard[row + 1][col + 2].chessPiece.moveType == 2 && chessBoard[row + 1][col + 2].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row + 1][col + 1].chessPiece) {
+        bCheckMate = true;
+      }
+      if(chessBoard[row + 1][col - 2].chessPiece && chessBoard[row + 1][col - 2].chessPiece.moveType == 2 && chessBoard[row + 1][col - 2].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row + 1][col - 1].chessPiece) {
+        bCheckMate = true;
+      }
+      if(row == chessBoard.row - 2) {
+        if(chessBoard[row + 2][col + 1].chessPiece && chessBoard[row + 2][col + 1].chessPiece.moveType == 2 && chessBoard[row + 2][col + 1].chessPiece.assignTo != kingChessPiece.assignTo && !chessBoard[row + 1][col + 1].chessPiece) {
+          bCheckMate = true;
+        }
+        if(chessBoard[row + 2][col - 1].chessPiece && chessBoard[row + 2][col - 1].chessPiece.moveType == 2 && chessBoard[row + 2][col - 1].chessPiece.assignTo != kingChessPiece.assignTo && !chessPiece[row + 1][col - 1].chessPiece) {
+          bCheckMate = true;
+        }
+      }
+    }
+  }
+  //  被炮将(北方)
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  if(row > 1) {
+    while(row > 0) {
+      if(!chessBoard[row - 1][col].chessPiece) {
+        row--;
+      } else {
+        row--;
+        while(row > 0) {
+          if(chessBoard[row - 1][col].chessPiece) {
+            if(chessBoard[row - 1][col].chessPiece.moveType == 6 && chessBoard[row - 1][col].chessPiece.assignTo != kingChessPiece.assignTo) {
+              bCheckMate = true;
+            }
+            break;
+          } else {
+            row--;
+          }
+        }
+        break;
+      }
+    }
+  }
+  //  被炮将(南方)
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  if(row < chessBoard.row - 1) {
+    while(row < chessBoard.row) {
+      if(!chessBoard[row + 1][col].chessPiece) {
+        row++;
+      } else {
+        row++;
+        while(row < chessBoard.row) {
+          if(chessBoard[row + 1][col].chessPiece) {
+            if(chessBoard[row + 1][col].chessPiece.moveType == 6 && chessBoard[row + 1][col].chessPiece.assignTo != kingChessPiece.assignTo) {
+              bCheckMate = true;
+            }
+            break;
+          } else {
+            row++;
+          }
+        }
+        break;
+      }
+    }
+  }
+  //  被炮将(东方)
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  while(col < chessBoard.col) {
+    if(!chessBoard[row][col + 1].chessPiece) {
+      col++;
+    } else {
+      col++;
+      while(col < chessBoard.col) {
+        if(chessBoard[row][col + 1].chessPiece) {
+          if(chessBoard[row][col + 1].chessPiece.moveType == 6 && chessBoard[row][col + 1].chessPiece.assignTo != kingChessPiece.assignTo) {
+            bCheckMate = true;
+          }
+          break;
+        } else {
+          col++;
+        }
+      }
+      break;
+    }
+  }
+  //  被炮将(西方)
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  while(col > 0) {
+    if(!chessBoard[row][col - 1].chessPiece) {
+      col--;
+    } else {
+      col--;
+      while(col > 0) {
+        if(chessBoard[row][col - 1].chessPiece) {
+          if(chessBoard[row][col - 1].chessPiece.moveType == 6 && chessBoard[row][col - 1].chessPiece.assignTo != kingChessPiece.assignTo) {
+            bCheckMate = true;
+          }
+          break;
+        } else {
+          col--;
+        }
+      }
+      break;
+    }
+  }
+  //  被兵将(东方)
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  if(chessBoard[row][col + 1].chessPiece && chessBoard[row][col + 1].chessPiece.moveType == 7 && chessBoard[row][col + 1].chessPiece.assignTo != kingChessPiece.assignTo) {
+    bCheckMate = true;
+  }
+  //  被兵将(西方)
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  if(chessBoard[row][col - 1].chessPiece && chessBoard[row][col - 1].chessPiece.moveType == 7 && chessBoard[row][col - 1].chessPiece.assignTo != kingChessPiece.assignTo) {
+    bCheckMate = true;
+  }
+  if(row == 0 || row == 1 || row == 2) {
+    //  被兵将(南方)
+    if(chessBoard[row + 1][col].chessPiece && chessBoard[row + 1][col].chessPiece.moveType == 7 && chessBoard[row + 1][col].chessPiece.assignTo != kingChessPiece.assignTo) {
+      bCheckMate = true;
+    }
+  }
+  if(row == chessBoard.row - 2 || row == chessBoard.row - 1 || row == chessBoard.row) {
+    //  被兵将(北方)
+    if(chessBoard[row - 1][col].chessPiece && chessBoard[row - 1][col].chessPiece.moveType == 7 && chessBoard[row - 1][col].chessPiece.assignTo != kingChessPiece.assignTo) {
+      bCheckMate = true;
+    }
+  }
+  //  被(将、帅)将
+  row = kingChessPiece.row;
+  col = kingChessPiece.col;
+  if(row == 0 || row == 1 || row == 2) {
+    while(row < chessBoard.row) {
+      if(chessBoard[row + 1][col].chessPiece) {
+        if(chessBoard[row + 1][col].chessPiece.moveType == 5) {
+          bCheckMate = true;
+        }
+        break;
+      } else {
+        row++;
+      }
+    }
+  }
+  if(row == chessBoard.row - 2 || row == chessBoard.row - 1 || row == chessBoard.row) {
+    while(row > 0) {
+      if(chessBoard[row - 1][col].chessPiece) {
+        if (chessBoard[row - 1][col].chessPiece.moveType == 5) {
+          bCheckMate = true;
+        }
+        break;
+      } else {
+        row--;
+      }
+    }
+  }
+  return bCheckMate;
+}
+function checkLose() {
+  return this.chessPiece.every(e => e.moveList.length == 0);
+}
+//  当前选中棋子可行驶路线
+function routeList() {
+  const RADIUS = 15;
+  const SPACE = (canvas.width - PADDING_NUM * 2) / 8;
+  var arycheckedChessPiece = this.chessPiece.filter(function (item) {
+    return item.checked;
+  });
+  if(arycheckedChessPiece.length > 0) {
+    var checkedChessPiece = arycheckedChessPiece[0];
+    for(let i = 0, len = checkedChessPiece.moveList.length; i < len; i++) {
+      context.beginPath();
+      context.fillStyle = '#000';
+      context.globalAlpha = 0.4;
+      context.arc(this.chessBoard[checkedChessPiece.moveList[i][0]][checkedChessPiece.moveList[i][1]].x,
+      this.chessBoard[checkedChessPiece.moveList[i][0]][checkedChessPiece.moveList[i][1]].y, RADIUS, Math.PI * 2, false);
+      context.fill();
+    }
+  }
+}
+function Chess(width = 600, height = 667) {
+  [this.width, this.height] = [width, height];
+  this.chessBoard = [];
+  this.chessPiece = [];
+  this.init = function() {
+    drawBackground.call(this);
+    initChessBoard.call(this);
+  }
+}
+canvas.onclick = function (e) {
+  if(turn) {
+    var e = e || event.srcElement;
+    var x = e.offsetX;
+    var y = e.offsetY;
+    clearChessBord();
+    chess = new Chess(width, height);
+    chess.init();
+    var col = Math.ceil(Math.floor((x - PADDING_NUM) / ((width - 2 * PADDING_NUM) / 16)) / 2) ;
+    var row = Math.ceil(Math.floor((y - PADDING_NUM) / ((height - 2 * PADDING_NUM) / 18)) / 2) ;
+    selectedChess = aryPiece.filter(e => e.checked).length > 0 ? aryPiece.filter(e => e.checked)[0] : null;
+    if(selectedChess != null) {
+      selectedChess.checked = false;
+      let cur_row = selectedChess.row;
+      let cur_col = selectedChess.col;
+      if(moveList.filter(e => e[0] == row && e[1] == col).length > 0) {
+        selectedChess.x = chess.chessBoard[row][col].x;
+        selectedChess.y = chess.chessBoard[row][col].y;
+        if(row != cur_row || col != cur_col) {
+          for(let i = 0, len = aryPiece.length; i < len; i++) {
+            if(aryPiece[i].row == row && aryPiece[i].col == col && aryPiece[i].assignTo != assignTo) {
+              aryPiece.splice(i, 1);
+              break;
+            }
+          }
+        } 
+        aryPiece.forEach(t => {
+          if(t.row == cur_row && t.col == cur_col) {
+            t.row = row;
+            t.col = col;
+            t.checked = false;
+          }
+        });
+        chess.chessBoard[row][col].chessPiece = selectedChess;
+        chess.chessBoard[cur_row][cur_col].chessPiece = null;
+        chess.chessPiece.forEach(i => {
+          if(i.row == cur_row && i.col == cur_col) {
+            i.row = row;
+            i.col = col;
+            i.checked = false;
+            i.x = selectedChess.x;
+            i.y = selectedChess.y;
+          }
+        });
+      }
+      if(row == cur_row && col == cur_col) {
+        turn = true;
+      } else {
+        if(moveList.filter(e => e[0] == row && e[1] == col).length > 0) {
+          turn = false;
+          highLightChessPiece = [];
+          let aryPieceFormat = JSON.parse(JSON.stringify(aryPiece));
+          aryPieceFormat.forEach(e => {
+            e.row = 9 - e.row;
+            e.col = 8 - e.col;
+            e.x = chess.chessBoard[e.row][e.col].x;
+            e.y = chess.chessBoard[e.row][e.col].y;
+          });
+          socket.emit('play', {id: id, chess: JSON.stringify(aryPieceFormat), highLightChessPiece: [9 - row, 8 - col]});
+          socket.emit('turn', {id: id, turn: assignTo == 'HAN' ? 'CHU' : 'HAN'});
+        } else {
+          turn = true;
+        }
+      }
+    }
+    initChessPiece.call(chess, aryPiece.map(function(item) {
+      if(turn) {
+        if(item.assignTo == assignTo && selectedChess == null) {
+          item.checked = item.checked ? false : item.row == row && item.col == col;
+        } else {
+          item.checked = false;
+        }
+      } else {
+        item.checked = false;
+      }
+      return item;
+    }));
+    fillChessBoard.call(chess);
+    if(selectedChess == null) {
+      detectionRoute.call(chess);
+      routeList.call(chess);
+    } else {
+      moveList = [];
+      selectedChess = null;
+    }
+    if(chess.chessBoard[row][col].chessPiece != null) {
+      moveList = chess.chessBoard[row][col].chessPiece.moveList;
+    }
+  }
+}
+socket.on('login', function(data) {
+  id = data.id;
+  divRegister.style.display = 'none';
+  btnFindOpponent.style.display = '';
+  divMsg.innerText = data.msg;
+  var strUser = '';
+  for(var i = 0, len = data.users.length; i < len; i++) {
+    strUser += data.users[i].name + ',';
+  }
+  divMsg.innerText += '当前共有' + data.users.length + '人在线:' + strUser;
+});
+socket.on('match', function(data) {
+  var strLoading = '';
+  var i = 1;
+  var flag = false;
+  if(id == data.id) {
+    if(data.error) {
+      clearInterval(timer);
+    } else if(data.success) {
+      setTimeout(() => {
+        divFindOpponent.classList.add('fade-out');
+      }, 0);
+      setTimeout(() => {
+        divFindOpponent.style.display = 'none';
+        divFindSuccess.style.display = '';
+      }, 1500);
+      assignTo = data.assignTo == 'HAN' ? 'CHU' : 'HAN';
+      document.getElementById('myName').innerHTML = txtName.value;
+      document.getElementById('opponentName').innerHTML = data.name;
+      if(assignTo == 'HAN') {
+        document.getElementById('myName').style.color = 'red';
+        document.getElementById('opponentName').style.color = 'black';
+      } else {
+        document.getElementById('myName').style.color = 'black';
+        document.getElementById('opponentName').style.color = 'red';
+      }
+      clearInterval(timer);
+      chess = new Chess(width, height);
+      chess.init();
+      aryPiece = [
+        {name: assignTo == 'HAN' ? '车' : '車', radius: RADIUS, assignTo: assignTo, moveType: 1, checked: false, row: 9, col: 0, x: chess.chessBoard[9][0].x,
+        y: chess.chessBoard[9][0].y},
+        {name: assignTo == 'HAN' ? '马' : '馬', radius: RADIUS, assignTo: assignTo, moveType: 2, checked: false, row: 9, col: 1, x: chess.chessBoard[9][1].x,
+        y: chess.chessBoard[9][1].y},
+        {name: assignTo == 'HAN' ? '相' : '象', radius: RADIUS, assignTo: assignTo, moveType: 3, checked: false, row: 9, col: 2, x: chess.chessBoard[9][2].x,
+        y: chess.chessBoard[9][2].y},
+        {name: assignTo == 'HAN' ? '仕' : '士', radius: RADIUS, assignTo: assignTo, moveType: 4, checked: false, row: 9, col: 3, x: chess.chessBoard[9][3].x,
+        y: chess.chessBoard[9][3].y},
+        {name: assignTo == 'HAN' ? '帥' : '將', radius: RADIUS, assignTo: assignTo, moveType: 5, checked: false, row: 9, col: 4, x: chess.chessBoard[9][4].x,
+        y: chess.chessBoard[9][4].y},
+        {name: assignTo == 'HAN' ? '仕' : '士', radius: RADIUS, assignTo: assignTo, moveType: 4, checked: false, row: 9, col: 5, x: chess.chessBoard[9][5].x,
+        y: chess.chessBoard[9][5].y},
+        {name: assignTo == 'HAN' ? '相' : '象', radius: RADIUS, assignTo: assignTo, moveType: 3, checked: false, row: 9, col: 6, x: chess.chessBoard[9][6].x,
+        y: chess.chessBoard[9][6].y},
+        {name: assignTo == 'HAN' ? '马' : '馬', radius: RADIUS, assignTo: assignTo, moveType: 2, checked: false, row: 9, col: 7, x: chess.chessBoard[9][7].x,
+        y: chess.chessBoard[9][7].y},
+        {name: assignTo == 'HAN' ? '车' : '車', radius: RADIUS, assignTo: assignTo, moveType: 1, checked: false, row: 9, col: 8, x: chess.chessBoard[9][8].x,
+        y: chess.chessBoard[9][8].y},
+        {name: '炮', radius: RADIUS, assignTo: assignTo, moveType: 6, checked: false, row: 7, col: 1, x: chess.chessBoard[7][1].x,
+        y: chess.chessBoard[7][1].y},
+        {name: '炮', radius: RADIUS, assignTo: assignTo, moveType: 6, checked: false, row: 7, col: 7, x: chess.chessBoard[7][7].x,
+        y: chess.chessBoard[7][7].y},
+        {name: assignTo == 'HAN' ? '兵' : '卒', radius: RADIUS, assignTo: assignTo, moveType: 7, checked: false, row: 6, col: 0, x: chess.chessBoard[6][0].x,
+        y: chess.chessBoard[6][0].y},
+        {name: assignTo == 'HAN' ? '兵' : '卒', radius: RADIUS, assignTo: assignTo, moveType: 7, checked: false, row: 6, col: 2, x: chess.chessBoard[6][2].x,
+        y: chess.chessBoard[6][2].y},
+        {name: assignTo == 'HAN' ? '兵' : '卒', radius: RADIUS, assignTo: assignTo, moveType: 7, checked: false, row: 6, col: 4, x: chess.chessBoard[6][4].x,
+        y: chess.chessBoard[6][4].y},
+        {name: assignTo == 'HAN' ? '兵' : '卒', radius: RADIUS, assignTo: assignTo, moveType: 7, checked: false, row: 6, col: 6, x: chess.chessBoard[6][6].x,
+        y: chess.chessBoard[6][6].y},
+        {name: assignTo == 'HAN' ? '兵' : '卒', radius: RADIUS, assignTo: assignTo, moveType: 7, checked: false, row: 6, col: 8, x: chess.chessBoard[6][8].x,
+        y: chess.chessBoard[6][8].y},
+        {name: assignTo == 'HAN' ? '車' : '车', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 1, checked: false, row: 0, col: 0, x: chess.chessBoard[0][0].x,
+        y: chess.chessBoard[0][0].y},
+        {name: assignTo == 'HAN' ? '馬' : '马', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 2, checked: false, row: 0, col: 1, x: chess.chessBoard[0][1].x,
+        y: chess.chessBoard[0][1].y},
+        {name: assignTo == 'HAN' ? '象' : '相', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 3, checked: false, row: 0, col: 2, x: chess.chessBoard[0][2].x,
+        y: chess.chessBoard[0][2].y},
+        {name: assignTo == 'HAN' ? '士' : '仕', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 4, checked: false, row: 0, col: 3, x: chess.chessBoard[0][3].x,
+        y: chess.chessBoard[0][3].y},
+        {name: assignTo == 'HAN' ? '將' : '帥', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 5, checked: false, row: 0, col: 4, x: chess.chessBoard[0][4].x,
+        y: chess.chessBoard[0][4].y},
+        {name: assignTo == 'HAN' ? '士' : '仕', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 4, checked: false, row: 0, col: 5, x: chess.chessBoard[0][5].x,
+        y: chess.chessBoard[0][5].y},
+        {name: assignTo == 'HAN' ? '象' : '相', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 3, checked: false, row: 0, col: 6, x: chess.chessBoard[0][6].x,
+        y: chess.chessBoard[0][6].y},
+        {name: assignTo == 'HAN' ? '馬' : '马', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 2, checked: false, row: 0, col: 7, x: chess.chessBoard[0][7].x,
+        y: chess.chessBoard[0][7].y},
+        {name: assignTo == 'HAN' ? '車' : '车', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 1, checked: false, row: 0, col: 8, x: chess.chessBoard[0][8].x,
+        y: chess.chessBoard[0][8].y},
+        {name: '炮', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 6, checked: false, row: 2, col: 1, x: chess.chessBoard[2][1].x,
+        y: chess.chessBoard[2][1].y},
+        {name: '炮', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 6, checked: false, row: 2, col: 7, x: chess.chessBoard[2][7].x,
+        y: chess.chessBoard[2][7].y},
+        {name: assignTo == 'HAN' ? '卒' : '兵', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 7, checked: false, row: 3, col: 0, x: chess.chessBoard[3][0].x,
+        y: chess.chessBoard[3][0].y},
+        {name: assignTo == 'HAN' ? '卒' : '兵', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 7, checked: false, row: 3, col: 2, x: chess.chessBoard[3][2].x,
+        y: chess.chessBoard[3][2].y},
+        {name: assignTo == 'HAN' ? '卒' : '兵', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 7, checked: false, row: 3, col: 4, x: chess.chessBoard[3][4].x,
+        y: chess.chessBoard[3][4].y},
+        {name: assignTo == 'HAN' ? '卒' : '兵', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 7, checked: false, row: 3, col: 6, x: chess.chessBoard[3][6].x,
+        y: chess.chessBoard[3][6].y},
+        {name: assignTo == 'HAN' ? '卒' : '兵', radius: RADIUS, assignTo: assignTo == 'HAN' ? 'CHU' : 'HAN', moveType: 7, checked: false, row: 3, col: 8, x: chess.chessBoard[3][8].x,
+        y: chess.chessBoard[3][8].y}
+      ];
+      initChessPiece.call(chess, aryPiece);
+      fillChessBoard.call(chess);
+      detectionRoute.call(chess);
+      socket.emit('turn', {id: id, turn: 'HAN'});
+    } else {
+      timer = setInterval(function () {
+        if (strLoading.length <= 3 && !flag) {
+          i++;
+        } else {
+          flag = true;
+          i--;
+          if (strLoading.length == 0) {
+            flag = false;
+            i = 1;
+          }
+        }
+        strLoading = '.'.repeat(i);
+        divMsg.innerText = '寻找对手中' + strLoading;
+      }, 500);
+    }
+    divMsg.innerText = data.msg;
+  }
+});
+socket.on('play', function(data) {
+  aryPiece = JSON.parse(data.chess);
+  highLightChessPiece = data.highLightChessPiece;
+  clearChessBord();
+  chess = new Chess(width, height);
+  chess.init();
+  initChessPiece.call(chess, aryPiece);
+  fillChessBoard.call(chess);
+  detectionRoute.call(chess);
+  routeList.call(chess);
+  if(checkLose.call(chess)) {
+    turn = false;
+    drawGameOver.call(chess, '败北', true);
+    socket.emit('win', {id: id});
+  } else {
+    if(checkMate(assignTo, chess.chessBoard)) {
+      drawCheck.call(chess);
+    }
+  }
+});
+socket.on('win', function() {
+  turn = false;
+  drawGameOver.call(chess, '胜利', false);
+})
+socket.on('turn', function(data) {
+  myTime.innerHTML = '';
+  opponentTime.innerHTML = '';
+  turn = data.turn == assignTo;
+  let limited_time = 120;
+  clearInterval(timer_turn);
+  let timing = spanTime => () => {
+    timer_turn = setInterval(() => {
+      if(limited_time <= 0) {
+        clearInterval(timer_turn);
+        if(turn) {
+          drawGameOver.call(chess, '败北', true);
+          socket.emit('win', {id: id});
+        } 
+        turn = false;
+      } else {
+        limited_time -= 1;
+        let m = ~~(limited_time / 60);
+        let s = (limited_time % 60);
+        if(m == 0) {
+          spanTime.innerHTML = s.toString().padStart(2, 0) + ' s';
+        } else {
+          spanTime.innerHTML = m + ':'.padStart(2, ' ').padEnd(3, ' ') + s.toString().padStart(2, 0);
+        }
+      }
+    }, 1000);
+  }
+  if(turn) {
+    timing(myTime)();
+  } else {
+    timing(opponentTime)();
+  }
+});
+//  注册用户名，用于在server端记录下所有玩家
+document.getElementById('btnRegister').onclick = function() {
+  var txtName = document.getElementById('txtName');
+  if(txtName.value.trim() == '') {
+    txtName.style.borderColor = 'red';
+  } else {
+    socket.emit('login', { name: txtName.value });
+  }
+}
+//  匹配玩家
+document.getElementById('btnFindOpponent').onclick = function() {
+  this.disabled = true;
+  socket.emit('match', {id: id});
+}
+</script>
