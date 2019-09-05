@@ -3,20 +3,120 @@
 }
 .home .header {
     width: 100%;
-    height: 100px;
+    height: 50px;
     background-color: rgba(0, 0, 0, .8);
+}
+.home .header .operation-list {
+    display: block;
+    height: 46px;
+    padding: 2px;
+    background-color: rgba(0, 0, 0);
+}
+.home .header .operation-list .operation-item {
+    display: inline-block;
+    width: 50px;
+    height: 46px;
+    line-height: 46px;
+    vertical-align: middle;
+    text-align: center;
+    color: #4e4e4e;
+    font-size: 40px;
+}
+.home .header .operation-list .operation-item:hover {
+    color: #fff;
+    cursor: pointer;
 }
 .home .sidebar {
     width: 15%;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 50px);
     float: left;
     background-color: rgba(0, 0, 0, .8);
 }
+.home .sidebar .control-search {
+    height: 30px;
+}
+.home .sidebar .control-search .control-search-input {
+    width: 169px;
+    height: 30px;
+    border: 0;
+    padding-right: 30px;
+    background-color: rgba(0, 0, 0, .2);
+    color: #fff;
+}
+.home .sidebar .control-search::after {
+    content: '\e905';
+    font-family: 'lazyform';
+    position: absolute;
+    display: inline-block;
+    height: 30px;
+    line-height: 30px;
+    width: 30px;
+    font-size: 20px;
+    vertical-align: middle;
+    text-align: center;
+    margin-left: -30px;
+    color: #4e4e4e;
+}
+.home .sidebar .control-list {
+    list-style: none;
+    color: gray;
+    height: 100%;
+    padding: 0;
+    margin-block-start: 0;
+}
+.home .sidebar .control-list .control-container .control-a {
+    display: block;
+    height: 30px;
+    cursor: pointer;
+}
+.home .sidebar .control-list .control-container .control-a .control-icon {
+    display: inline-block;
+    width: 20%;
+    line-height: 30px;
+    height: 30px;
+    text-align: center;
+    vertical-align: middle;
+}
+.home .sidebar .control-list .control-container .control-a .control-text {
+    display: inline-block;
+    height: 30px;
+    line-height: 30px;
+    vertical-align: middle;
+    width: 80%;
+}
+.home .sidebar .control-list .control-container:hover {
+    background-color: rgba(0, 0, 0, 1);
+    color: #fff;
+}
 .home .content {
     width: 85%;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 50px);
     float: left;
-    background-color: rgba(100, 100, 100, .3);
+    /* background-color: rgba(100, 100, 100, .3); */
+}
+.home .content .tab-container {
+    display: inline-block;
+    width: 100%;
+    height: 60px;
+    line-height: 60px;
+    background-color: rgba(0, 0, 0, .8);
+}
+.home .content .tab-container .tab-list {
+    height: 30px;
+}
+.home .content .tab-container .tab-list .tab-item {
+    line-height: 30px;
+    float: left;
+    padding: 0 30px;
+    background-color: rgba(100, 100, 100, .8);
+    border-radius: 10px 10px 0 0;
+}
+.home .content .tab-container .tab-list .tab-item::after {
+    content: '';
+}
+.home .content .tab-container .tab-operation {
+    background-color: rgba(100, 100, 100, .8);
+    height: 30px;
 }
 .home .content .design-area {
     float: left;

@@ -1,13 +1,11 @@
 (function() {
-    this.LazyForm = function() {
-        Controller.call(this);
+    this.LazyForm = function(opt) {
+        Item.call(this, opt);
         this.init();
     };
-    inheritProto(LazyForm, Controller);
-    LazyForm.prototype.init = function() {
-        this.el = document.createElement('div');
-        this.el.className = 'home';
-    }
+    inheritProto(LazyForm, Item);
+    LazyForm.controllerList = {};
+    LazyForm.modelList = {};
     LazyForm.prototype.render = function() {
         document.body.appendChild(this.getElement());
     }
