@@ -22,6 +22,19 @@
         {
             id: 0,
             name: '新建表单1'
+        },
+        {
+            id: 1,
+            name: '新建表单2'
+        },
+        {
+            id: 2,
+            name: '新建表单3'
+        }
+        ,
+        {
+            id: 3,
+            name: '新建表单4'
         }
     ];
     var __sidebar = new LazyForm.sidebar(sidebarList);

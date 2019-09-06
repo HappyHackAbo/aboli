@@ -19,11 +19,23 @@
         var tabList = new Item({
             className: 'tab-list'
         }).init();
-        for(var i = 0, len = data.length, tabItem; i < len; i++) {
+        for(var i = 0, len = data.length, tabItem, tabItemText, tabItemIcon, tabItemClose; i < len; i++) {
             tabItem = new Item({
-                className: 'tab-item'
+                className: data[i].className
             }).init();
-            tabItem.el.innerHTML = data[i].name;
+            tabItemText = new Item({
+                className: 'tab-text'
+            }).init();
+            tabItemText.el.innerHTML = data[i].name;
+            tabItemIcon = new Item({
+                className: 'tab-item-icon'
+            }).init();
+            tabItemClose = new Item({
+                className: 'tab-item-close lazyform-remove'
+            }).init();
+            tabItemIcon.add(tabItemClose);
+            tabItem.add(tabItemText)
+                   .add(tabItemIcon);
             tabList.add(tabItem);
         }
         var operationContainer = new Item({

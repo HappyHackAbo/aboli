@@ -103,16 +103,117 @@
 }
 .home .content .tab-container .tab-list {
     height: 30px;
+    padding-left: 10px;
 }
 .home .content .tab-container .tab-list .tab-item {
     line-height: 30px;
     float: left;
-    padding: 0 30px;
-    background-color: rgba(100, 100, 100, .8);
+    /* background-color: rgba(100, 100, 100, .8); */
+    background-color: transparent;
     border-radius: 10px 10px 0 0;
+    color: gray;
+    cursor: default;
+}
+.home .content .tab-container .tab-list .tab-item:hover {
+    color: lightgray;
+    background-color: rgba(100, 100, 100, .4);
+}
+.home .content .tab-container .tab-list .active {
+    color: lightgray;
+    background-color: rgba(100, 100, 100, .8);
+}
+.home .content .tab-container .tab-list .active:hover {
+    background-color: rgba(100, 100, 100, .8);
+}
+.home .content .tab-container .tab-list .tab-item::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    position: absolute;
+    margin-left: -10px;
+    margin-top: 20px;
+    background: transparent;
+}
+.home .content .tab-container .tab-list .tab-item:hover::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    position: absolute;
+    margin-left: -10px;
+    margin-top: 20px;
+    background: radial-gradient(20px 20px at left top, transparent 46%, rgba(100, 100, 100, .4) 54%);
+}
+.home .content .tab-container .tab-list .active:hover::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    position: absolute;
+    margin-left: -10px;
+    margin-top: 20px;
+    background: radial-gradient(20px 20px at left top, transparent 46%, rgba(100, 100, 100, .8) 54%);
+}
+.home .content .tab-container .tab-list .active-right:hover::before {
+    content: '';
+    background: transparent;
 }
 .home .content .tab-container .tab-list .tab-item::after {
     content: '';
+    width: 10px;
+    height: 10px;
+    position: absolute;
+    margin-left: 30px;
+    margin-top: 20px;
+    background: transparent;
+}
+.home .content .tab-container .tab-list .tab-item:hover::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    position: absolute;
+    margin-left: 30px;
+    margin-top: 20px;
+    background: radial-gradient(20px 20px at right top, transparent 46%, rgba(100, 100, 100, .4) 54%);
+}
+.home .content .tab-container .tab-list .active:hover::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    position: absolute;
+    margin-left: 30px;
+    margin-top: 20px;
+    background: radial-gradient(20px 20px at right top, transparent 46%, rgba(100, 100, 100, .8) 54%);
+}
+.home .content .tab-container .tab-list .active-left:hover::after {
+    content: '';
+    background: transparent;
+}
+.home .content .tab-container .tab-list .tab-item .tab-text {
+    height: 30px;
+    line-height: 30px;
+    vertical-align: middle;
+    float: left;
+    padding-left: 10px;
+}
+.home .content .tab-container .tab-list .tab-item .tab-item-icon {
+    width: 30px;
+    height: 30px;
+    float: right;
+    text-align: center;
+}
+.home .content .tab-container .tab-list .tab-item .tab-item-icon .tab-item-close {
+    display: inline-block;
+    line-height: 30px;
+}
+.home .content .tab-container .tab-list .tab-item .tab-item-icon .tab-item-close:hover {
+    color: #fff;
+}
+.home .content .tab-container .tab-list .active::before {
+    content: '';
+    background: radial-gradient(20px 20px at left top, transparent 46%, rgba(100, 100, 100, .8) 54%);
+}
+.home .content .tab-container .tab-list .active::after {
+    content: '';
+    background: radial-gradient(20px 20px at right top, transparent 46%, rgba(100, 100, 100, .8) 54%);
 }
 .home .content .tab-container .tab-operation {
     background-color: rgba(100, 100, 100, .8);
