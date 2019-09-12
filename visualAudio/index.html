@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="style.css">
+        <style>
+            .container {
+                width: 1300px;
+                height: 500px;
+                overflow: hidden;
+            }
+            .rotate {
+                position: absolute;
+                left: 500px;
+                top: 100px;
+                width: 300px;
+                height: 300px;
+                background: rgba(0, 0, 0, .8);
+                background-image: url(images/mj.jpg);
+                background-size: contain;
+                border: 0;
+                border-radius: 50%;
+                text-align: center;
+                animation: test 60s ease-in 0s infinite;
+                -webkit-animation: test 60s ease-in 0s infinite;
+            }
+            @keyframes test {
+                0% {
+                    transform: rotate(0deg);
+                    -webkit-transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                    -webkit-transform: rotate(360deg);
+                }
+            }
+            @-webkit-keyframes test {
+                0% {
+                    transform: rotate(0deg);
+                    -webkit-transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                    -webkit-transform: rotate(360deg);
+                }
+            }
+            canvas {
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .icon {
+                font-size: 100px;
+                background-image: -webkit-linear-gradient(left bottom, green, transparent);
+                background-clip: text;
+                -webkit-text-fill-color: transparent;
+                -webkit-background-clip: text;
+            }
+        </style>
+    </head>
+    <body style="background: #fff;">
+        <div class="container">
+            <!-- <i class="lazyform-remove-circle icon"></i> -->
+            <div class="rotate">
+            </div>
+            <canvas id="canvas" width="1300" height="500">
+            </canvas>
+        </div>
+    </body>
+    <script>
+        var canvas = document.getElementById('canvas'), ctx;
+        if(canvas.getContext('2d')) {
+            ctx = canvas.getContext('2d');
+            var x = 650, 
+                y = 250, 
+                r = 165, 
+                pointDeg = 3,   // 间隔角度
+                cap = 5,        // 线条宽度
+                amplitude = 50, // 振幅
+                random, 
+                timer;
+            timer = setInterval(function() {
+                canvas.width = 1300;
+                canvas.height = 500;
+                for(var i = 0; i < 360; i += pointDeg) { 
+                    random = amplitude * Math.random();
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(130, 250, 180)';
+                    ctx.lineWidth = cap;
+                    ctx.lineCap = 'round';
+                    ctx.moveTo(x + Math.cos(i / 180 * Math.PI) * r, y - Math.sin(i / 180 * Math.PI) * r);
+                    ctx.lineTo(x + Math.cos(i / 180 * Math.PI) * (r + random), y - Math.sin(i / 180 * Math.PI) * (r + random));
+                    ctx.stroke();
+                }
+            }, 200);
+        }
+    </script>
+</html>
